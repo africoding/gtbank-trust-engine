@@ -5,7 +5,7 @@ from datetime import datetime
 from app.database import SessionLocal
 from app.models import Transaction
 
-def process_transfer(sender, recipient, amount):
+def process_transfer(user_id, sender, recipient, amount):
 
     # ============================================
     # SECTION 1: TRANSACTION RECORD SCHEMA
@@ -16,6 +16,13 @@ def process_transfer(sender, recipient, amount):
     timestamp = datetime.now()
     reference = f"GTB-{timestamp.strftime('%y%m%d')}-{random.randint(1000,9999)}"
     status = "initiating"
+
+    print(f"\n--- GTBank Trust Engine ---")
+    print(f"Transaction ID: {transaction_id}")
+    print(f"Sender: {sender}")
+    print(f"Recipient: {recipient}")
+    print(f"Amount: ₦{amount}")
+    print(f"Timestamp: {timestamp}")
 
     # ============================================
     # SECTION 2: NIBSS STATE ORCHESTRATION
@@ -58,24 +65,24 @@ def process_transfer(sender, recipient, amount):
     # ============================================
 
     if status == "success":
-        message = f"✅ ₦{amount} has landed in {recipient}'s account."
+        message = f"✅ ₦{amount} has landed in {recipient}'s account. Transaction confirmed by NIBSS."
     elif status == "failed":
-        message = f"❌ ₦{amount} was not sent. Your money is safe."
+        message = f"❌ ₦{amount} was not sent. Your money is safe. Try again later."
     elif status == "reversed":
-        message = f"↩️ ₦{amount} returned to your account."
+        message = f"↩️ ₦{amount} returned to your account. Nothing was deducted."
     elif status == "stuck":
-        message = f"⚠️ ₦{amount} is being investigated."
+        message = f"⚠️ ₦{amount} is being investigated. You will be notified within 24 hours."
     elif status == "delay_finality":
-        message = f"⏳ ₦{amount} confirmed but waiting for settlement."
+        message = f"⏳ ₦{amount} confirmed but waiting for settlement. Usually resolves in 1-2 hours."
     elif status == "reconciliation_required":
-        message = f"🔍 ₦{amount} needs manual verification."
+        message = f"🔍 ₦{amount} needs manual verification. GTBank officer will resolve within 24 hours."
     else:
-        message = "⚠️ Something unexpected happened. Your money is safe."
+        message = "⚠️ Something unexpected happened. Your money is safe. Contact GTBank."
 
     db = SessionLocal()
     transaction = Transaction(
         transaction_id=str(transaction_id),
-        sender=sender,
+        user_id=user_id,
         recipient=recipient,
         amount=amount,
         timestamp=timestamp,
@@ -92,4 +99,3 @@ def process_transfer(sender, recipient, amount):
         "status": status,
         "message": message
     }
-

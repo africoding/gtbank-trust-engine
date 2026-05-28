@@ -15,9 +15,9 @@ from datetime import datetime
 # What the API expects to RECEIVE
 # ============================================
 
+
 class TransferRequest(BaseModel):
-    sender: str = Field(..., example="Emeka")
-    recipient: str = Field(..., example="Kosi")
+    recipient: str = Field(..., example="0809876543")
     amount: float = Field(..., example=50000)
 
     class Config:
@@ -52,7 +52,7 @@ class TransferResponse(BaseModel):
 
 class TransactionDetail(BaseModel):
     transaction_id: str
-    sender: str
+    user_id: str        # ← changed from sender
     recipient: str
     amount: float
     timestamp: datetime
@@ -78,5 +78,36 @@ class HealthResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str = Field(..., example="Transaction not found")
+
+    # ============================================
+# USER SCHEMAS
+# ============================================
+
+class UserRegister(BaseModel):
+    full_name: str
+    phone: str
+    pin: str
+    email: Optional[str] = None
+    bvn: Optional[str] = None
+    nin: Optional[str] = None
+
+class UserLogin(BaseModel):
+    phone: str
+    pin: str
+
+class UserResponse(BaseModel):
+    id: str
+    full_name: str
+    phone: str
+    balance: float
+    kyc_tier: str
+
+    class Config:
+        from_attributes = True
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserResponse
 
     
