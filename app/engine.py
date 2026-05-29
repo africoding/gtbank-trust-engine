@@ -33,7 +33,7 @@ def process_transfer(user_id, sender, recipient, amount):
 
     print("\n--- Contacting NIBSS ---")
     attempt = 1
-    max_attempts = 5
+    max_attempts = 3
 
     while attempt <= max_attempts:
         status = random.choice([
@@ -46,7 +46,7 @@ def process_transfer(user_id, sender, recipient, amount):
             "reversed"
         ])
 
-        base_wait = 2 ** attempt
+        base_wait = 0.5 * attempt
         jitter = random.uniform(0, 1)
         wait_time = base_wait + jitter
 
