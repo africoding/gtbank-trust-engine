@@ -1,3 +1,7 @@
+import hmac
+import hashlib
+import requests as http_requests
+import os
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -256,3 +260,83 @@ def lookup_transfer(reference: str, db: Session = Depends(get_db)):
         "reference": transaction.reference,
         "message": transaction.message
     }
+
+# ============================================
+# ENDPOINT 9: INITIALIZE PAYMENT
+# POST /fund-account
+# Creates Paystack payment link
+# ============================================
+@app.post("/fund-account")
+def fund_account(
+    request: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    amount = request.get("amount")
+    if not amount or amount < 100:
+        raise HTTPException(status_code=400, detail="Minimum funding amount is ₦100")
+
+    paystack_secret = os.getenv("PAYSTACK_SECRET_KEY")
+
+    response = http_requests.post(
+        "https://api.paystack.co/transaction/initialize",
+        headers={
+            "Authorization": f"Bearer {paystack_secret}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "email": current_user.phone + "@gtbank.com",
+            "amount": int(amount * 100),  # Paystack uses kobo
+            "metadata": {
+                "user_id": current_user.id,
+                "phone": current_user.phone
+            }
+        }
+    )
+
+    data = response.json()
+    if not data.get("status"):
+        raise HTTPException(status_code=400, detail="Payment initialization failed")
+
+    return {
+        "payment_url": data["data"]["authorization_url"],
+        "reference": data["data"]["reference"]
+    }
+
+
+# ============================================
+# ENDPOINT 10: PAYSTACK WEBHOOK
+# POST /webhook/paystack
+# Receives payment confirmation from Paystack
+# Verifies signature before updating balance
+# ============================================
+@app.post("/webhook/paystack")
+async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
+    from fastapi import Request
+    paystack_secret = os.getenv("PAYSTACK_SECRET_KEY")
+
+    body = await request.body()
+    signature = request.headers.get("x-paystack-signature")
+
+    computed = hmac.new(
+        paystack_secret.encode(),
+        body,
+        hashlib.sha512
+    ).hexdigest()
+
+    if computed != signature:
+        raise HTTPException(status_code=401, detail="Invalid signature")
+
+    payload = await request.json()
+
+    if payload.get("event") == "charge.success":
+        data = payload["data"]
+        user_id = data["metadata"]["user_id"]
+        amount = data["amount"] / 100
+
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            user.balance += amount
+            db.commit()
+
+    return {"status": "ok"}
