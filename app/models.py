@@ -13,6 +13,7 @@ class User(Base):
     balance = Column(Float, default=0.0)
     kyc_tier = Column(String, default="tier1")
     created_at = Column(DateTime)
+    profile_photo = Column(String, nullable=True)
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -24,3 +25,4 @@ class Transaction(Base):
     status = Column(String)
     reference = Column(String)
     message = Column(String)
+

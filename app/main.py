@@ -2,7 +2,7 @@ import hmac
 import hashlib
 import requests as http_requests
 import os
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -17,6 +17,16 @@ from app.auth import create_token, verify_token
 from datetime import datetime
 import bcrypt
 import uuid
+import cloudinary
+import cloudinary.uploader
+
+# Configure Cloudinary
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET")
+)
+
 
 # ============================================
 # CREATE ALL DATABASE TABLES ON STARTUP
@@ -340,3 +350,46 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
             db.commit()
 
     return {"status": "ok"}
+
+# ============================================
+# ENDPOINT 11: UPLOAD PROFILE PHOTO
+# POST /upload-photo
+# Protected - requires JWT token
+# ============================================
+@app.post("/upload-photo")
+async def upload_photo(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        contents = await file.read()
+        result = cloudinary.uploader.upload(
+            contents,
+            folder="gtbank_profiles",
+            public_id=f"user_{current_user.id}",
+            overwrite=True,
+            transformation=[
+                {"width": 200, "height": 200, "crop": "fill"}
+            ]
+        )
+        photo_url = result.get("secure_url")
+        current_user.profile_photo = photo_url
+        db.commit()
+        return {"photo_url": photo_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# ENDPOINT 12: GET PROFILE PHOTO
+# GET /profile-photo
+# Protected - requires JWT token
+# ============================================
+@app.get("/profile-photo")
+def get_profile_photo(current_user: User = Depends(get_current_user)):
+    return {
+        "photo_url": current_user.profile_photo or None,
+        "full_name": current_user.full_name,
+        "phone": current_user.phone
+    }
