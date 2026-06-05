@@ -393,3 +393,24 @@ def get_profile_photo(current_user: User = Depends(get_current_user)):
         "full_name": current_user.full_name,
         "phone": current_user.phone
     }
+
+
+# ============================================
+# ENDPOINT 13: SILENT TOKEN REFRESH
+# POST /refresh
+# Protected - requires valid JWT token
+# ============================================
+@app.post("/refresh")
+def refresh_token(current_user: User = Depends(get_current_user)):
+    new_token = create_token(current_user.id, current_user.phone)
+    return {
+        "access_token": new_token,
+        "token_type": "bearer",
+        "user": {
+            "id": current_user.id,
+            "full_name": current_user.full_name,
+            "phone": current_user.phone,
+            "balance": current_user.balance,
+            "kyc_tier": current_user.kyc_tier
+        }
+    }
