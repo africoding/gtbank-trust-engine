@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Depends, Request, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from app.database import Base, engine, SessionLocal
 from app.engine import process_transfer
 from app.models import Transaction, User
@@ -81,14 +82,19 @@ def get_current_user(
 # ENDPOINT 1: HEALTH CHECK
 # GET /health
 # ============================================
+
 @app.get("/health")
-def health_check():
+def health_check(db: Session = Depends(get_db)):
+    db.execute(text("SELECT 1"))  # tiny real query so Supabase sees activity
     return {
         "status": "alive",
         "engine": "GTBank Trust Engine",
         "version": "2.0.0",
         "message": "Selling certainty to uncertainty"
     }
+
+
+
 
 # ============================================
 # ENDPOINT 2: REGISTER
