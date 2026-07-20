@@ -14,7 +14,7 @@ from app.schemas import (
     TransferRequest, TransferResponse,
     UserRegister, UserLogin, TokenResponse, UserResponse
 )
-from app.auth import create_token, verify_token
+from app.auth import create_token, verify_token, verify_token_allow_expired
 from datetime import datetime
 import bcrypt
 import uuid
@@ -407,7 +407,16 @@ def get_profile_photo(current_user: User = Depends(get_current_user)):
 # Protected - requires valid JWT token
 # ============================================
 @app.post("/refresh")
-def refresh_token(current_user: User = Depends(get_current_user)):
+def refresh_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+    payload = verify_token_allow_expired(credentials.credentials)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Session too old, please log in again")
+    current_user = db.query(User).filter(User.id == payload["user_id"]).first()
+    if not current_user:
+        raise HTTPException(status_code=401, detail="User not found")
     new_token = create_token(current_user.id, current_user.phone)
     return {
         "access_token": new_token,
