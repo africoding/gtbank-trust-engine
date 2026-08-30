@@ -2,7 +2,9 @@ import hmac
 import hashlib
 import requests as http_requests
 import os
-from fastapi import FastAPI, HTTPException, Depends, Request, File, UploadFile
+from fastapi import FastAPI, HTTPException, Depends, Request, File, UploadFile, Header
+from sqlalchemy.exc import IntegrityError
+from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -209,17 +211,45 @@ def lookup_account(account_number: str, db: Session = Depends(get_db)):
 def create_transfer(
     request: TransferRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key")
 ):
+    if idempotency_key:
+        existing = db.query(Transaction).filter(
+            Transaction.idempotency_key == idempotency_key
+        ).first()
+        if existing:
+            if existing.user_id != current_user.id:
+                raise HTTPException(status_code=409, detail="Idempotency key already used")
+            return {
+                "reference": existing.reference,
+                "status": existing.status,
+                "message": existing.message
+            }
+
     if current_user.balance < request.amount:
         raise HTTPException(status_code=400, detail="Insufficient balance")
 
-    result = process_transfer(
-        user_id=current_user.id,
-        sender=current_user.full_name,
-        recipient=request.recipient,
-        amount=request.amount
-    )
+    try:
+        result = process_transfer(
+            user_id=current_user.id,
+            sender=current_user.full_name,
+            recipient=request.recipient,
+            amount=request.amount,
+            idempotency_key=idempotency_key
+        )
+    except IntegrityError:
+        db.rollback()
+        existing = db.query(Transaction).filter(
+            Transaction.idempotency_key == idempotency_key
+        ).first()
+        if existing:
+            return {
+                "reference": existing.reference,
+                "status": existing.status,
+                "message": existing.message
+            }
+        raise HTTPException(status_code=409, detail="Duplicate request")
 
     if result["status"] == "success":
         current_user.balance -= request.amount
