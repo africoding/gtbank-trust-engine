@@ -113,6 +113,7 @@ Every transaction carries a human-readable `reference` (`GTB-YYMMDD-NNNN`) and a
 - Secrets (`DATABASE_URL`, `SECRET_KEY`) loaded from environment, not committed
 - Pydantic schemas reject malformed payloads before they reach business logic
 - Errors return structured responses rather than leaking internals
+- **Idempotency keys** on `/transfer` — a repeated request returns the original transaction instead of creating a duplicate, enforced by a UNIQUE database constraint
 
 ---
 
@@ -167,7 +168,6 @@ This is an active portfolio project. The NIBSS interaction is currently **simula
 
 Next:
 
-- [ ] Idempotency keys on `/transfer` so a retried request returns the original transaction instead of creating a second one
 - [ ] Move the transfer state machine behind an explicit interface so a real provider can be swapped in
 - [ ] Wrap debit + transaction insert in a single database transaction
 - [ ] Automated tests for each state transition and the retry loop
