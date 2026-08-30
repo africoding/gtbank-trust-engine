@@ -26,3 +26,4 @@ class Transaction(Base):
     reference = Column(String)
     message = Column(String)
 
+    idempotency_key = Column(String, unique=True, index=True, nullable=True)

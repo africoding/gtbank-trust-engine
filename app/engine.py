@@ -5,7 +5,7 @@ from datetime import datetime
 from app.database import SessionLocal
 from app.models import Transaction
 
-def process_transfer(user_id, sender, recipient, amount):
+def process_transfer(user_id, sender, recipient, amount, idempotency_key=None):
 
     # ============================================
     # SECTION 1: TRANSACTION RECORD SCHEMA
@@ -88,7 +88,8 @@ def process_transfer(user_id, sender, recipient, amount):
         timestamp=timestamp,
         status=status,
         reference=reference,
-        message=message
+        message=message,
+        idempotency_key=idempotency_key
     )
     db.add(transaction)
     db.commit()
